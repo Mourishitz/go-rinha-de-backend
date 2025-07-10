@@ -1,0 +1,87 @@
+O serviço a ser desenvolvido vai ser um "proxy"
+
+
+Ele irá interagir com duas instancias de um payment processor que irão sofrer instabilidades aleatorias, podendo ser atraso e indisponibilidade.
+
+Será implementado processamento assincrono
+
+
+                                                   ┌─────────┐
+                                               ┌──►│Worker #1├───┐                            ┌──────────────────────────┐
+                                               │   └─────────┘   │                        ┌──►│Payment Processor Default │
+                                               │                 │                        │   └──────────────────────────┘
+   ┌──────┐        ┌────────┐        ┌──────┐  │   ┌─────────┐   │      ┌─────────────┐   │
+   │Client├───────►│API Http├────────┤Broker├──┼──►│Worker #2│───┼──────┤Load Balancer├───┤
+   └──────┘        └────────┘        └──────┘  │   └─────────┘   │      └─────────────┘   │   ┌──────────────────────────┐
+                                               │                 │                        └──►│Payment Processor Fallback│
+                                               │   ┌─────────┐   │                            └──────────────────────────┘
+                                               └──►│Worker #3├───┘
+                                                   └─────────┘
+
+
+
+Exemplo de Request de Client─►API
+
+/payments
+
+``` 
+POST /payments
+{
+    "correlationId": "4a7901b8-7d26-4d9d-aa19-4dc1c7cf60b3",
+    "amount": 19.90
+}
+
+HTTP 2XX
+Qualquer coisa
+```
+
+Onde correlationId é um UUID e unico
+amount é obrigatoriamente decimal (fudeu)
+
+
+
+/payments-summary
+
+```
+GET /payments-summary?from=2020-07-10T12:34:56.000Z&to=2020-07-10T12:35:56.000Z
+
+HTTP 200 - Ok
+{
+    "default" : {
+        "totalRequests": 43236,
+        "totalAmount": 415542345.98
+    },
+    "fallback" : {
+        "totalRequests": 423545,
+        "totalAmount": 329347.34
+    }
+}
+```
+
+from e to sao um timestamp ISO em UTC (3 horas a frente do Brasil)
+ambos opcionais
+
+os campos devem ser dos tipos inteiros e decimais respectivos
+
+IMPORTANTE: Os serviços de payment também possuem o endpoint payments-summary
+Durante o teste, a aplicação API Http e os serviços vao ser chamados, as respostas devem ser coesas ou o teste irá tirar pontos por consistencia
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

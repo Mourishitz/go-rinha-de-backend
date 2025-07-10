@@ -1,0 +1,119 @@
+Resumo dos Endpoints
+
+As tabelas abaixo oferem um resumo para facilitar a visão geral da solução.
+
+Endpoints a serem desenvolvidos
+┌──────────────────────┐┌───────────────────────────────────────────────────────────────┐
+│ Endpoints 	         ││ Descrição                                                     │
+└──────────────────────┘└───────────────────────────────────────────────────────────────┘
+┌──────────────────────┐┌───────────────────────────────────────────────────────────────┐
+│ POST /payments       ││ Intermedia a requisição para o processamento dum pagamento.   │
+├──────────────────────┤├───────────────────────────────────────────────────────────────┤
+│ GET /payments-summary││ Exibe detalhes das requisições de processamento de pagamentos.│
+└──────────────────────┘└───────────────────────────────────────────────────────────────┘
+
+Endpoints disponíveis no serviço Payment Processor Default
+
+┌───────────────────────────────────┐┌──────────────────────────────────────────────────────────────────────────────────────────┐
+│ Endpoints 	                      ││ Descrição                                                                                │
+└───────────────────────────────────┘└──────────────────────────────────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────┐┌──────────────────────────────────────────────────────────────────────────────────────────┐
+│ POST /payments                    ││ Requisita o processamento de um pagamento.                                               │
+├───────────────────────────────────┤├──────────────────────────────────────────────────────────────────────────────────────────┤
+│ GET /payments/service-health      ││ Verifica as condições de funcionamento do endpoint de pagamentos.                        │
+├───────────────────────────────────┤├──────────────────────────────────────────────────────────────────────────────────────────┤
+│ GET /payments/{id}                ││ Exibe detalhes de uma requisição de processamento de pagamento.                          │
+├───────────────────────────────────┤├──────────────────────────────────────────────────────────────────────────────────────────┤
+│ GET /admin/payments-summary       ││ Exibe detalhes das requisições de processamento de pagamentos.                           │
+├───────────────────────────────────┤├──────────────────────────────────────────────────────────────────────────────────────────┤
+│ PUT /admin/configurations/token   ││ Redefine um token de acesso necessário para todos os endpoints prefixados com '/admin/'. │
+├───────────────────────────────────┤├──────────────────────────────────────────────────────────────────────────────────────────┤
+│ PUT /admin/configurations/delay   ││ Configura o atraso no endpoint de pagamentos.                                            │
+├───────────────────────────────────┤├──────────────────────────────────────────────────────────────────────────────────────────┤
+│ PUT /admin/configurations/failure ││ Configura falha no endpoint de pagamentos.                                               │
+├───────────────────────────────────┤├──────────────────────────────────────────────────────────────────────────────────────────┤
+│ POST /admin/purge-payments        ││ Elimina todos os pagamentos da base de dados. Para desenvolvimento apenas.               │
+└───────────────────────────────────┘└──────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+
+Rotas do Payments
+
+/payments
+```
+POST /payments
+{
+    "correlationId": "4a7901b8-7d26-4d9d-aa19-4dc1c7cf60b3",
+    "amount": 19.90,
+    "requestedAt" : "2025-07-15T12:34:56.000Z"
+}
+
+HTTP 200 - Ok
+{
+    "message": "payment processed successfully"
+}
+
+```
+Este endpoint recebe e computa um pagamento – ele é similar ao endpoint Payments que seu backend precisa disponibilizar. É o principal endpoint para você integrar com seu backend.
+
+requisição
+
+    correlationId é um campo obrigatório e único do tipo UUID.
+    amount é um campo obrigatório do tipo decimal.
+    requestedAt é um campo obrigatório do tipo timestamp no formato ISO em UTC.
+
+resposta
+
+    message é campo sempre presente do tipo texto.
+
+
+
+Health Check
+/payments/service-health
+```
+GET /payments/service-health
+
+HTTP 200 - Ok
+{
+    "failing": false,
+    "minResponseTime": 100
+}
+```
+requisição - Não há parâmetros para requisição. Entretanto, este endpoint impõe um limite de chamadas – 1 chamada a cada 5 segundos.
+Se este limite for ultrapassado, você receberá uma resposta de erro do tipo HTTP 429 - Too Many Requests.
+
+resposta
+
+    failing é um campo sempre presente do tipo booleano que indica se o endpoint Payments está disponível. Se não estiver, significa que requisições para o endpoint receberão erros HTTP5XX.
+
+    minResponseTime é um campo sempre presente do tipo inteiro indicando o melhor tempo de resposta possível para o endpoint Payments. 
+    Por exemplo, se o valor retornado for 100, não haverá respostas mais rápidas do que 100ms.
+
+
+
+
+Payment Details
+
+Você não precisa se integrar com este endpoint. Ele serve para troubleshooting, caso queira/precise.
+
+GET /payments/{id}
+```
+HTTP 200 - Ok
+{
+    "correlationId": "4a7901b8-7d26-4d9d-aa19-4dc1c7cf60b3",
+    "amount": 19.90,
+    "requestedAt" : 2025-07-15T12:34:56.000Z
+}
+```
+
+requisição - {id} é um parâmetro obrigatório do tipo UUID.
+
+resposta
+
+    correlationId é um campo sempre presente do tipo UUID.
+    amount é um campo sempre presente do tipo decimal.
+    requestedAt é um campo sempre presente do tipo timestamp no formato ISO em UTC
+
+
+
+
