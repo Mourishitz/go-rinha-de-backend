@@ -1,0 +1,34 @@
+Overview do desafio:
+- O sistema é um proxy que interage com dois processadores de pagamento, um principal e um de fallback.
+- O objetivo é processar o maximo de requisições no processador principal, e usar o de fallback apenas quando necessário.
+- O fallback cobra duas vezes mais taxas que o principal, então é importante minimizar seu uso.
+- Um load balancer é obrigatorio e no minimo duas instancias de proxy são obrigatórias.
+- O sistema deve ser capaz de lidar com atrasos e falhas aleatórias (que vao acontecer).
+- As limitações de hardware são:
+  - 1.5 CPUs
+  - 350MB de RAM
+
+Pontos importantes:
+- Quanto menos requisições para o fallback, melhor.
+- O proxy deve ser o mais leve possível, para não consumir muitos recursos.
+- A requisição de summary tem como prioridade ser consistente, não é necessário ser a mais performática possível.
+
+Minhas sugestões de implementação:
+
+- 1: Implementar um load balancer principal (Gateway) que distribui as requisições entre duas instâncias do Sistema (proxy).
+- 1.1: Haverá um sistema terceiro chamado Doctor, ele irá, de 5 em 5 segundos, verificar se o payment processor principal está funcionando corretamente.
+- 1.2: Se o Doctor identificar down no payment principal, ele irá (através de um Server Stream RPC) notificar as instâncias do Sistema (proxy) que o payment processor principal está down.
+- 1.3: No momento que o Doctor identificar o payment processor como up, ele irá notificar novamente as instâncias do Sistema (proxy) que o payment processor principal está up.
+- 1.4: O Sistema (proxy) irá armazenar o estado do payment processor principal e, caso ele esteja down, irá redirecionar as requisições para o payment processor de fallback.
+- 2: O sistema (proxy) somente pegará requisições passadas pelo Gateway e, então, passará elas para o principal payment processor que estiver up.
+- 2.1: O sistema (proxy) não guardará estado, ou seja, não guardará requisições passadas.
+- 2.2: O sistema (proxy) irá armazenar o estado do payment processor principal, se ele estiver down, irá redirecionar as requisições para o payment processor de fallback.
+- 2.3: Caso uma requisição de summary seja feita, o proxy irá buscar as informações de ambos os payments processors.
+
+Problemas/dificuldades:
+- Tentar tornar todos os sistemas o mais leve possível, para não consumir muitos recursos.
+- Implementar o load balancer de forma que ele distribua as requisições entre as instâncias do sistema (proxy) de forma justa.
+- Implementar o sistema de monitoramento (Doctor) que verifica o estado do payment processor principal e notifica as instâncias do sistema (proxy) quando ele está down ou up.
+- Lidar com as falhas e atrasos aleatórios dos payment processors, garantindo que o sistema continue funcionando mesmo quando um deles estiver indisponível.
+
+See: ./assets/system_design.png
