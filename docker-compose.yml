@@ -1,13 +1,13 @@
 services:
-  go-rinha-de-backend:
-    build:
-      context: .
-      dockerfile: GoRinha.dockerfile
-    restart: always
-    ports:
-      - "8080:80"
-    networks:
-      - payment-processor
+  # go-rinha-de-backend:
+  #   build:
+  #     context: .
+  #     dockerfile: GoRinha.dockerfile
+  #   restart: always
+  #   ports:
+  #     - "8080:80"
+  #   networks:
+  #     - payment-processor
 
   # doctor:
   #   build:
@@ -19,23 +19,9 @@ services:
   #   networks:
   #     - payment-processor
 
-  payment-processor-1:
-    image: zanfranceschi/payment-processor
-    networks:
-      - payment-processor
-    hostname: payment-processor-default
-    ports:
-      - 8001:8080
-
-  payment-processor-2:
-    image: zanfranceschi/payment-processor
-    networks:
-      - payment-processor
-    hostname: payment-processor-fallback
-    ports:
-      - 8002:8080
-
 networks:
-  payment-processor:
-    name: payment-processor
+  rinha-backend:
+    name: rinha-backend
     driver: bridge
+  payment-processor:
+    external: true
