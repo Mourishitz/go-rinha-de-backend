@@ -1,0 +1,59 @@
+OK, esquece o system design anterior, algo novo coçou nas partes certas da minha cachola.
+
+O system design anterior é esse aqui: ./assets/system-design.png
+
+Ele consistia em:
+
+- 1 Gateway (NGinx) que iria balancear carga entre 3 instâncias do servidor (App)
+- 3 Instâncias do servidor (App) que iriam processar as requisições
+- 1 Instância de um serviço de health check (Doctor) que iria checar o status de cada um dos serviços de Payments
+- 1 Instância do Payments (Default) que iria processar os pagamentos
+- 1 Instância do Payments (Fallback) que iria processar somente caso o Payments (Default) falhasse 
+
+
+Porém, percebi esses problemas:
+
+1. Caso ambos os serviços de Payments falhassem, o sistema inteiro iria parar.
+2. Caso o app recebesse uma mensagem do Doctor dizendo que o Payments está fora do ar, ele não alteraria o valor da variável de estado a tempo, causando o app a perder a requisição atual.
+3. O App estaria fazendo mais de uma coisa por vez (recebendo requisições, escutando mudanças do Doctor, enviando status para o Doctor e enviando requisições ao Payments)
+
+Com isso, bolei a nova estratégia de system design:
+
+                                                               Doctor vai constantemente atualizar e ser atualizado
+                                                               sobre o status de ambos os serviços de payments     
+                                                                           ┌──────┐
+                                                                   ┌──────►│Doctor│◄────────────┐
+                                                                   ▼       └──────┘             │
+                                                            ┌────────────┐                      │
+                            ┌───────┐                       │┌──────────┐│                      │                      ┌───────────────────┐
+                        ┌───┤App (1)├────┐               ┌──│┤Worker (1)├│───┐                  ▼                ┌───► │Payments (Default) │
+                        │   └───────┘    │               │  │└──────────┘│   │       ┌──────────────────────┐    │     └───────────────────┘
+           ┌───────┐    │   ┌───────┐    │   ┌──────┐    │  │┌──────────┐│   │       │Verifica as variaveis:│    │
+           │Gateway├────┼───┤App (2)├────┼───┤Broker├────┼──│┤Worker (2)├│───┼──────►│   - IsPaymentsUp     │────┤
+           └───────┘    │   └───────┘    │   └──────┘    │  │└──────────┘│   │       │   - IsFallbackUp     │    │
+                        │   ┌───────┐    │               │  │┌──────────┐│   │       └──────────────────────┘    │     ┌───────────────────┐
+                        └───┤App*(3)├────┘               └──│┤Worker (3)├│───┘                                   └───► │Payments (Fallback)│
+                            └───────┘                       │└──────────┘│                                             └───────────────────┘
+                                                            └────────────┘
+           Modelo de LB: Round Robin
+
+           * Nota: Talvez o número de instâncias caia pra 2
+             pois a fila pode ficar grande demais e o teste
+             irá parar antes que todos sejam processados
+
+
+O plano infalível!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
