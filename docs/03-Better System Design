@@ -16,15 +16,16 @@ Porém, percebi esses problemas:
 1. Caso ambos os serviços de Payments falhassem, o sistema inteiro iria parar.
 2. Caso o app recebesse uma mensagem do Doctor dizendo que o Payments está fora do ar, ele não alteraria o valor da variável de estado a tempo, causando o app a perder a requisição atual.
 3. O App estaria fazendo mais de uma coisa por vez (recebendo requisições, escutando mudanças do Doctor, enviando status para o Doctor e enviando requisições ao Payments)
+4. O App não fazia a contagem de requisições que cada instância do Payments recebeu, o que é um dos pré requisitos.
 
 Com isso, bolei a nova estratégia de system design:
 
                                                                Doctor vai constantemente atualizar e ser atualizado
                                                                sobre o status de ambos os serviços de payments     
-                                                                           ┌──────┐
-                                                                   ┌──────►│Doctor│◄────────────┐
-                                                                   ▼       └──────┘             │
-                                                            ┌────────────┐                      │
+                                             ┌───────┐                      ┌──────┐
+                                ┌───────────►│KeyDB**│◄─────────┐   ┌──────►│Doctor│◄───────────┐
+                                │            └───────┘          ▼   ▼       └──────┘            │
+                                ▼                           ┌────────────┐                      │
                             ┌───────┐                       │┌──────────┐│                      │                      ┌───────────────────┐
                         ┌───┤App (1)├────┐               ┌──│┤Worker (1)├│───┐                  ▼                ┌───► │Payments (Default) │
                         │   └───────┘    │               │  │└──────────┘│   │       ┌──────────────────────┐    │     └───────────────────┘
@@ -34,12 +35,16 @@ Com isso, bolei a nova estratégia de system design:
                         │   ┌───────┐    │               │  │┌──────────┐│   │       └──────────────────────┘    │     ┌───────────────────┐
                         └───┤App*(3)├────┘               └──│┤Worker (3)├│───┘                                   └───► │Payments (Fallback)│
                             └───────┘                       │└──────────┘│                                             └───────────────────┘
-                                                            └────────────┘
-           Modelo de LB: Round Robin
-
+                                                            └────────────┘       
+           Modelo de LB: Round Robin                                             
+                                                                                 
            * Nota: Talvez o número de instâncias caia pra 2
              pois a fila pode ficar grande demais e o teste
              irá parar antes que todos sejam processados
+
+           ** Nota: O KeyDB é um banco em memória que
+              armazena a quantidade de requisições que
+              cada instância do Payments recebeu
 
 
 O plano infalível!
