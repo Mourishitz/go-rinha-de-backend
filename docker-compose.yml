@@ -1,13 +1,21 @@
 services:
-  # go-rinha-de-backend:
-  #   build:
-  #     context: .
-  #     dockerfile: GoRinha.dockerfile
-  #   restart: always
-  #   ports:
-  #     - "8080:80"
-  #   networks:
-  #     - payment-processor
+  go-proxy:
+    build:
+      context: ./docker/go
+      dockerfile: GoProxy.dockerfile
+    restart: always
+    environment:
+      - PROCESSOR_DEFAULT_URL=http://payment-processor-default:8080
+      - PROCESSOR_FALLBACK_URL=http://payment-processor-fallback:8080
+    deploy:
+      resources:
+        limits:
+          cpus: "0.55"
+          memory: "30MB"
+    ports:
+      - "8080:80"
+    networks:
+      - payment-processor
 
   # doctor:
   #   build:
