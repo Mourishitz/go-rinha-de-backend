@@ -7,7 +7,22 @@ import (
 )
 
 func (app *Config) Payments(w http.ResponseWriter, r *http.Request) {
-	// Publish a message to RabbitMQ
+	var requestPayload struct {
+		CorrelationID string `json:"correlationId"`
+		Amount        string `json:"amount"`
+	}
+
+	err := app.readJSON(w, r, &requestPayload)
+	if err != nil {
+		app.errorJSON(w, err, http.StatusBadRequest)
+		return
+	}
+
+	app.writeJSON(w, http.StatusOK, jsonResponse{
+		Message: "Payments endpoint is up and running, rabbitMQ message sent!",
+		Data:    nil,
+	})
+
 	app.rabbitMQChann.Publish(
 		"",
 		"payments_queue",
@@ -15,14 +30,9 @@ func (app *Config) Payments(w http.ResponseWriter, r *http.Request) {
 		false,
 		amqp.Publishing{
 			ContentType: "application/json",
-			Body:        []byte(`{"message": "Payment request received"}`),
+			Body:        []byte(`{"correlationId":"` + requestPayload.CorrelationID + `", "amount":"` + requestPayload.Amount + `"}`),
 		},
 	)
-
-	app.writeJSON(w, http.StatusOK, jsonResponse{
-		Message: "Payments endpoint is up and running, rabbitMQ message sent!",
-		Data:    nil,
-	})
 }
 
 func (app *Config) PaymentsSummary(w http.ResponseWriter, r *http.Request) {
