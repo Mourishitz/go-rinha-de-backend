@@ -10,10 +10,11 @@ import (
 )
 
 type Config struct {
-	paymentsURL   string
-	fallbackURL   string
-	isPaymentsUp  bool
-	isFallbackUp  bool
+	paymentsURL  string
+	fallbackURL  string
+	isPaymentsUp bool
+	isFallbackUp bool
+	// This can possibly change to Redis in the future
 	rabbitMQConn  *amqp.Connection
 	rabbitMQChann *amqp.Channel
 }
