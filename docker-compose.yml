@@ -25,8 +25,7 @@ services:
     restart: always
     environment:
       - APP_PORT=8080
-      - PROCESSOR_DEFAULT_URL=http://payment-processor-default:8080
-      - PROCESSOR_FALLBACK_URL=http://payment-processor-fallback:8080
+      - INSTANCE_ID=1
       - RABBITMQ_URL=amqp://rinha:rinha@rabbitmq:5672/
     deploy:
       resources:
@@ -44,8 +43,7 @@ services:
     hostname: api2
     environment:
       - APP_PORT=8080
-      - PROCESSOR_DEFAULT_URL=http://payment-processor-default:8080
-      - PROCESSOR_FALLBACK_URL=http://payment-processor-fallback:8080
+      - INSTANCE_ID=2
       - RABBITMQ_URL=amqp://rinha:rinha@rabbitmq:5672/
 
   broker:

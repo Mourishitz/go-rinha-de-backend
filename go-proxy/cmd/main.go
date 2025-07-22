@@ -10,10 +10,7 @@ import (
 )
 
 type Config struct {
-	paymentsURL  string
-	fallbackURL  string
-	isPaymentsUp bool
-	isFallbackUp bool
+	instance string
 	// This can possibly change to Redis in the future
 	rabbitMQConn  *amqp.Connection
 	rabbitMQChann *amqp.Channel
@@ -47,10 +44,7 @@ func main() {
 	defer ch.Close()
 
 	app := Config{
-		isPaymentsUp:  true, // Set to false if the default payment service is down
-		isFallbackUp:  true, // Set to false if the fallback service is down
-		paymentsURL:   os.Getenv("PROCESSOR_DEFAULT_URL"),
-		fallbackURL:   os.Getenv("PROCESSOR_FALLBACK_URL"),
+		instance:      os.Getenv("INSTANCE_ID"),
 		rabbitMQConn:  conn,
 		rabbitMQChann: ch,
 	}

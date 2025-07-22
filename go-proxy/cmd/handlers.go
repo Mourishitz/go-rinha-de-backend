@@ -30,7 +30,7 @@ func (app *Config) Payments(w http.ResponseWriter, r *http.Request) {
 		false,
 		amqp.Publishing{
 			ContentType: "application/json",
-			Body:        []byte(`{"correlationId":"` + requestPayload.CorrelationID + `", "amount":"` + requestPayload.Amount + `"}`),
+			Body:        []byte(`{"correlationId":"` + requestPayload.CorrelationID + `", "amount":"` + requestPayload.Amount + `", "instance":"` + app.instance + `"}`),
 		},
 	)
 }
