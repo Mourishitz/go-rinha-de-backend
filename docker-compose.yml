@@ -26,6 +26,7 @@ services:
     restart: always
     environment:
       - APP_PORT=8080
+      - KEYDB_SERVICE_URL=keydb:6379
       - INSTANCE_ID=1
       - RABBITMQ_URL=amqp://rinha:rinha@rabbitmq:5672/
     deploy:
@@ -45,6 +46,7 @@ services:
     hostname: api2
     environment:
       - APP_PORT=8080
+      - KEYDB_SERVICE_URL=keydb:6379
       - INSTANCE_ID=2
       - RABBITMQ_URL=amqp://rinha:rinha@rabbitmq:5672/
 

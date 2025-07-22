@@ -20,10 +20,7 @@ func (app *Config) Payments(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	app.writeJSON(w, http.StatusOK, jsonResponse{
-		Message: "Payments endpoint is up and running, rabbitMQ message sent!",
-		Data:    nil,
-	})
+	app.writeNoContent(w)
 
 	app.rabbitMQChann.Publish(
 		"",
@@ -43,8 +40,26 @@ func (app *Config) Payments(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *Config) PaymentsSummary(w http.ResponseWriter, r *http.Request) {
-	app.writeJSON(w, http.StatusOK, jsonResponse{
-		Message: "Payments summary endpoint is up and running",
-		Data:    nil,
+	paymentsTotalRequests, err := app.ReadAllRequests("payments")
+	FailOnError(err, "Failed to read total requests from KeyDB")
+
+	paymentsTotalAmount, err := app.ReadTotalAmount("payments")
+	FailOnError(err, "Failed to read total amount from KeyDB")
+
+	fallbackTotalRequests, err := app.ReadAllRequests("fallback")
+	FailOnError(err, "Failed to read fallback total requests from KeyDB")
+
+	fallbackTotalAmount, err := app.ReadTotalAmount("fallback")
+	FailOnError(err, "Failed to read fallback total amount from KeyDB")
+
+	app.writeJSON(w, http.StatusOK, map[string]any{
+		"default": map[string]any{
+			"totalRequests": paymentsTotalRequests,
+			"totalAmount":   paymentsTotalAmount,
+		},
+		"fallback": map[string]any{
+			"totalRequests": fallbackTotalRequests,
+			"totalAmount":   fallbackTotalAmount,
+		},
 	})
 }

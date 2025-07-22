@@ -7,6 +7,7 @@ import (
 	"os"
 
 	amqp "github.com/rabbitmq/amqp091-go"
+	"github.com/redis/go-redis/v9"
 )
 
 type Config struct {
@@ -14,6 +15,13 @@ type Config struct {
 	// This can possibly change to Redis in the future
 	rabbitMQConn  *amqp.Connection
 	rabbitMQChann *amqp.Channel
+	KeyDBClient   *redis.Client
+}
+
+func FailOnError(err error, msg string) {
+	if err != nil {
+		log.Panicf("%s: %s", msg, err)
+	}
 }
 
 func main() {
@@ -47,6 +55,9 @@ func main() {
 		instance:      os.Getenv("INSTANCE_ID"),
 		rabbitMQConn:  conn,
 		rabbitMQChann: ch,
+		KeyDBClient: redis.NewClient(&redis.Options{
+			Addr: os.Getenv("KEYDB_SERVICE_URL"),
+		}),
 	}
 
 	webPort := os.Getenv("APP_PORT")
