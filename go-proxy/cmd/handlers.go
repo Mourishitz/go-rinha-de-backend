@@ -1,15 +1,17 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
+	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 func (app *Config) Payments(w http.ResponseWriter, r *http.Request) {
 	var requestPayload struct {
-		CorrelationID string `json:"correlationId"`
-		Amount        string `json:"amount"`
+		CorrelationID string  `json:"correlationId"`
+		Amount        float32 `json:"amount"`
 	}
 
 	err := app.readJSON(w, r, &requestPayload)
@@ -30,7 +32,12 @@ func (app *Config) Payments(w http.ResponseWriter, r *http.Request) {
 		false,
 		amqp.Publishing{
 			ContentType: "application/json",
-			Body:        []byte(`{"correlationId":"` + requestPayload.CorrelationID + `", "amount":"` + requestPayload.Amount + `", "instance":"` + app.instance + `"}`),
+			Body: []byte(fmt.Sprintf(
+				`{"correlationId":"%s", "amount":%f, "requestedAt":"%s"}`,
+				requestPayload.CorrelationID,
+				requestPayload.Amount,
+				time.Now().Format("2006-01-02T15:04:05.000Z"),
+			)),
 		},
 	)
 }

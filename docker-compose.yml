@@ -18,6 +18,7 @@ services:
           memory: "15MB"
 
   api1: &api
+    container_name: api-1
     hostname: api1
     build:
       context: ./docker/go
@@ -40,6 +41,7 @@ services:
 
   api2:
     <<: *api
+    container_name: api-2
     hostname: api2
     environment:
       - APP_PORT=8080
@@ -59,10 +61,59 @@ services:
       RABBITMQ_DEFAULT_PASS: rinha
     healthcheck:
       test: rabbitmq-diagnostics -q ping
-      interval: 2s
-      timeout: 2s
+      interval: 5s
+      timeout: 5s
       retries: 3
 
+  worker1: &worker
+    container_name: worker-1
+    hostname: worker1
+    build:
+      context: ./docker/go
+      dockerfile: GoWorker.dockerfile
+    restart: always
+    environment:
+      - PAYMENT_PROCESSOR_DEFAULT_URL=http://payment-processor-default:8080
+      - PAYMENT_PROCESSOR_FALLBACK_URL=http://payment-processor-fallback:8080
+      - INSTANCE_ID=worker-1
+      - RABBITMQ_URL=amqp://rinha:rinha@rabbitmq:5672/
+    deploy:
+      resources:
+        limits:
+          cpus: "0.55"
+          memory: "30MB"
+    networks:
+      - rinha-backend
+      - payment-processor
+    depends_on:
+      broker:
+        condition: service_healthy
+
+  worker2:
+    <<: *worker
+    container_name: worker-2
+    hostname: worker2
+    environment:
+      - PAYMENT_PROCESSOR_DEFAULT_URL=http://payment-processor-default:8080
+      - PAYMENT_PROCESSOR_FALLBACK_URL=http://payment-processor-fallback:8080
+      - INSTANCE_ID=worker-2
+      - RABBITMQ_URL=amqp://rinha:rinha@rabbitmq:5672/
+    depends_on:
+      broker:
+        condition: service_healthy
+
+  worker3:
+    <<: *worker
+    container_name: worker-3
+    hostname: worker3
+    environment:
+      - PAYMENT_PROCESSOR_DEFAULT_URL=http://payment-processor-default:8080
+      - PAYMENT_PROCESSOR_FALLBACK_URL=http://payment-processor-fallback:8080
+      - INSTANCE_ID=worker-3
+      - RABBITMQ_URL=amqp://rinha:rinha@rabbitmq:5672/
+    depends_on:
+      broker:
+        condition: service_healthy
   # doctor:
   #   build:
   #     context: .
