@@ -65,6 +65,15 @@ services:
       timeout: 5s
       retries: 3
 
+  keydb:
+    image: eqalpha/keydb:alpine
+    container_name: keydb
+    ports:
+      - "6379:6379"
+    networks:
+      - rinha-backend
+    restart: always
+
   worker1: &worker
     container_name: worker-1
     hostname: worker1
@@ -75,6 +84,7 @@ services:
     environment:
       - PAYMENT_PROCESSOR_DEFAULT_URL=http://payment-processor-default:8080
       - PAYMENT_PROCESSOR_FALLBACK_URL=http://payment-processor-fallback:8080
+      - KEYDB_SERVICE_URL=keydb:6379
       - INSTANCE_ID=worker-1
       - RABBITMQ_URL=amqp://rinha:rinha@rabbitmq:5672/
     deploy:
@@ -96,6 +106,7 @@ services:
     environment:
       - PAYMENT_PROCESSOR_DEFAULT_URL=http://payment-processor-default:8080
       - PAYMENT_PROCESSOR_FALLBACK_URL=http://payment-processor-fallback:8080
+      - KEYDB_SERVICE_URL=keydb:6379
       - INSTANCE_ID=worker-2
       - RABBITMQ_URL=amqp://rinha:rinha@rabbitmq:5672/
     depends_on:
@@ -109,6 +120,7 @@ services:
     environment:
       - PAYMENT_PROCESSOR_DEFAULT_URL=http://payment-processor-default:8080
       - PAYMENT_PROCESSOR_FALLBACK_URL=http://payment-processor-fallback:8080
+      - KEYDB_SERVICE_URL=keydb:6379
       - INSTANCE_ID=worker-3
       - RABBITMQ_URL=amqp://rinha:rinha@rabbitmq:5672/
     depends_on:

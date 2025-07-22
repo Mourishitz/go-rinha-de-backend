@@ -2,10 +2,10 @@ package main
 
 import (
 	"log"
-	"net/http"
 	"os"
 
 	amqp "github.com/rabbitmq/amqp091-go"
+	"github.com/redis/go-redis/v9"
 )
 
 func FailOnError(err error, msg string) {
@@ -19,9 +19,9 @@ type Config struct {
 	FallbackServiceURL string
 	DoctorServiceURL   string
 	KeyDBServiceURL    string
+	KeyDBClient        *redis.Client
 	IsPaymentsUp       bool
 	IsFallbackUp       bool
-	HttpClient         *http.Client
 }
 
 func main() {
@@ -68,9 +68,12 @@ func main() {
 		FallbackServiceURL: os.Getenv("PAYMENT_PROCESSOR_FALLBACK_URL"),
 		DoctorServiceURL:   os.Getenv("DOCTOR_SERVICE_URL"),
 		KeyDBServiceURL:    os.Getenv("KEYDB_SERVICE_URL"),
-		IsPaymentsUp:       true,
-		IsFallbackUp:       true,
-		HttpClient:         &http.Client{},
+		KeyDBClient: redis.NewClient(&redis.Options{
+			Addr: os.Getenv("KEYDB_SERVICE_URL"),
+			DB:   0,
+		}),
+		IsPaymentsUp: true,
+		IsFallbackUp: true,
 	}
 
 	go func() {

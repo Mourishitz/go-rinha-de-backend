@@ -11,7 +11,7 @@ import (
 func (app *Config) Payments(w http.ResponseWriter, r *http.Request) {
 	var requestPayload struct {
 		CorrelationID string  `json:"correlationId"`
-		Amount        float32 `json:"amount"`
+		Amount        float64 `json:"amount"`
 	}
 
 	err := app.readJSON(w, r, &requestPayload)
