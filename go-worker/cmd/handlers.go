@@ -9,7 +9,7 @@ import (
 )
 
 type PaymentRequest struct {
-	Amount        float64 `json:"amount"`
+	Amount        float32 `json:"amount"`
 	CorrelationID string  `json:"correlationId"`
 	RequestedAt   string  `json:"requestedAt"`
 }
@@ -66,7 +66,7 @@ func (app *Config) SendPayment(body []byte) (any, error) {
 	return nil, errors.New("both payments and fallback services are down")
 }
 
-func (app *Config) UpdateSummary(amount float64, service string) error {
+func (app *Config) UpdateSummary(amount float32, service string) error {
 	totalRequests, err := app.ReadAllRequests(service)
 	FailOnError(err, "Failed to read total requests from keyDB")
 	totalAmount, err := app.ReadTotalAmount(service)

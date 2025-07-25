@@ -37,10 +37,10 @@ func (app *Config) ReadAllRequests(service string) (int, error) {
 	return value, nil
 }
 
-func (app *Config) ReadTotalAmount(service string) (float64, error) {
+func (app *Config) ReadTotalAmount(service string) (float32, error) {
 	ctx := context.Background()
 	key := service + "_total_amount"
-	value, err := app.KeyDBClient.Get(ctx, key).Float64()
+	value, err := app.KeyDBClient.Get(ctx, key).Float32()
 	if err != nil {
 		if err == redis.Nil {
 			return 0, nil // Key does not exist
