@@ -20,14 +20,6 @@ build-proxy:
 	@cd ..
 	@echo "Proxy built successfully."
 
-build-doctor:
-	@echo "Cleaning previous builds..."
-	@rm -f ./docker/go/builds/go-proxy/goDoctor
-	@echo "Building doctor..."
-	@cd ./go-doctor && GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o ../docker/go/builds/go-doctor/goDoctor ./cmd
-	@cd ..
-	@echo "Doctor built successfully."
-
 build-worker:
 	@echo "Cleaning previous builds..."
 	@rm -f ./docker/go/builds/go-worker/goWorker

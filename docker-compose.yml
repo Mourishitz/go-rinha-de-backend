@@ -128,15 +128,6 @@ services:
     depends_on:
       broker:
         condition: service_healthy
-  # doctor:
-  #   build:
-  #     context: .
-  #     dockerfile: Doctor.dockerfile
-  #   restart: always
-  #   ports:
-  #     - "8081:80"
-  #   networks:
-  #     - payment-processor
 
 networks:
   rinha-backend:
