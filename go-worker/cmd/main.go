@@ -44,7 +44,7 @@ func main() {
 	FailOnError(err, "Failed to declare a queue")
 
 	err = ch.Qos(
-		0,     // prefetch count
+		1,     // prefetch count
 		0,     // prefetch size
 		false, // global
 	)
@@ -81,14 +81,13 @@ func main() {
 
 			if !app.IsPaymentsUp && !app.IsFallbackUp {
 				d.Nack(false, true)
-				log.Println("Both payment services are down, requeuing message")
-				app.CheckServicesStatus()
+				app.CheckServicesStatus("default")
+				app.CheckServicesStatus("fallback")
 				continue
 			}
 
 			shouldAck, err := app.SendPayment(d.Body, d)
 			FailOnError(err, "Failed to send payment")
-			log.Printf("Done")
 
 			if shouldAck {
 				d.Ack(false)

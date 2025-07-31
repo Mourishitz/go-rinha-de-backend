@@ -22,6 +22,11 @@ func (app *Config) SendPayment(body []byte, d amqp091.Delivery) (bool, error) {
 	}
 
 	if app.IsFallbackUp {
+		app.CheckServicesStatus("default")
+		if app.IsPaymentsUp {
+			log.Println("Payments service is back up, retrying payment request")
+			return app.sendPaymentRequest(body, d)
+		}
 		return app.sendFallbackPayment(body, d)
 	}
 
@@ -29,13 +34,12 @@ func (app *Config) SendPayment(body []byte, d amqp091.Delivery) (bool, error) {
 }
 
 func (app *Config) sendPaymentRequest(body []byte, d amqp091.Delivery) (bool, error) {
-	log.Println("Sending payment request to payments service")
 	resp, err := http.Post(app.PaymentServiceURL+"/payments", "application/json", bytes.NewBuffer(body))
 	FailOnError(err, "Failed to send payment request to payments service")
 
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode == http.StatusInternalServerError {
 		log.Printf("Received non-OK response from payments service: %s", resp.Status)
 		app.IsPaymentsUp = false
 		log.Println("Payments status: ", app.IsPaymentsUp)
@@ -53,19 +57,16 @@ func (app *Config) sendPaymentRequest(body []byte, d amqp091.Delivery) (bool, er
 
 	err = app.UpdateSummary(paymentReq.Amount, "payments")
 	FailOnError(err, "Failed to update summary in keyDB")
-
-	log.Println("Payment request sent successfully")
 	return true, nil
 }
 
 func (app *Config) sendFallbackPayment(body []byte, d amqp091.Delivery) (bool, error) {
-	log.Println("Sending payment request to fallback service")
 	resp, err := http.Post(app.FallbackServiceURL+"/payments", "application/json", bytes.NewBuffer(body))
 	FailOnError(err, "Failed to send payment request to fallback service")
 
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode == http.StatusInternalServerError {
 		log.Printf("Received non-OK response from fallback service: %s", resp.Status)
 		app.IsFallbackUp = false
 		log.Println("Fallback status: ", app.IsFallbackUp)
@@ -80,8 +81,6 @@ func (app *Config) sendFallbackPayment(body []byte, d amqp091.Delivery) (bool, e
 
 	err = app.UpdateSummary(paymentReq.Amount, "fallback")
 	FailOnError(err, "Failed to update summary in keyDB")
-
-	log.Println("Fallback request sent successfully")
 	return true, nil
 }
 
