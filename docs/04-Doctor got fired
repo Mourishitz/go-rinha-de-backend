@@ -1,0 +1,81 @@
+Ok, meu projeto estaria usando um pequeno microsserviço chamado Doctor, que seria responsável por verificar a saúde dos serviços.
+No entanto, após alguns testes (sem o Doctor), percebi que os recursos estavam começando a se tornar escassos, então decidi remover o serviço Doctor do projeto.
+
+Mesmo com o Doctor sendo um serviço realmente leve e usando Protobufers e gRPC para desempenho e eficiência, percebi que ele pode ser "substituído" por algo semelhante.
+
+Apresentando: KeyDB Health Monitor
+
+
+Modelo antigo:
+
+                                                               Doctor vai constantemente atualizar e ser atualizado
+                                                               sobre o status de ambos os serviços de payments     
+                                             ┌───────┐                      ┌──────┐
+                                ┌───────────►│KeyDB**│◄─────────┐   ┌──────►│Doctor│◄───────────┐
+                                │            └───────┘          ▼   ▼       └──────┘            │
+                                ▼                           ┌────────────┐                      │
+                            ┌───────┐                       │┌──────────┐│                      │                      ┌───────────────────┐
+                        ┌───┤App (1)├────┐               ┌──│┤Worker (1)├│───┐                  ▼                ┌───► │Payments (Default) │
+                        │   └───────┘    │               │  │└──────────┘│   │       ┌──────────────────────┐    │     └───────────────────┘
+           ┌───────┐    │   ┌───────┐    │   ┌──────┐    │  │┌──────────┐│   │       │Verifica as variaveis:│    │
+           │Gateway├────┼───┤App (2)├────┼───┤Broker├────┼──│┤Worker (2)├│───┼──────►│   - IsPaymentsUp     │────┤
+           └───────┘    │   └───────┘    │   └──────┘    │  │└──────────┘│   │       │   - IsFallbackUp     │    │
+                        │   ┌───────┐    │               │  │┌──────────┐│   │       └──────────────────────┘    │     ┌───────────────────┐
+                        └───┤App*(3)├────┘               └──│┤Worker (3)├│───┘                                   └───► │Payments (Fallback)│
+                            └───────┘                       │└──────────┘│                                             └───────────────────┘
+                                                            └────────────┘       
+           Modelo de LB: Round Robin                                             
+                                                                                 
+           * Nota: Talvez o número de instâncias caia pra 2
+             pois a fila pode ficar grande demais e o teste
+             irá parar antes que todos sejam processados
+
+           ** Nota: O KeyDB é um banco em memória que
+              armazena a quantidade de requisições que
+              cada instância do Payments recebeu
+
+Novo modelo:
+
+
+                                                                KeyDB Health Monitor vai constantemente receber valores
+                                                                sobre o status de ambos os serviços de payments
+                                             ┌───────┐                      
+                                ┌───────────►│KeyDB**│◄─────────────────────────────────────────┐
+                                │            └───────┘                                          │
+                                ▼                           ┌────────────┐                      │
+                            ┌───────┐                       │┌──────────┐│                      │                      ┌───────────────────┐
+                        ┌───┤App (1)├────┐               ┌──│┤Worker (1)├│───┐                  ▼                ┌───► │Payments (Default) │
+                        │   └───────┘    │               │  │└──────────┘│   │       ┌──────────────────────┐    │     └───────────────────┘
+           ┌───────┐    │   ┌───────┐    │   ┌──────┐    │  │┌──────────┐│   │       │Verifica as variaveis:│    │
+           │Gateway├────┼───┤App (2)├────┼───┤Broker├────┼──│┤Worker (2)├│───┼──────►│   - IsPaymentsUp     │────┤
+           └───────┘    │   └───────┘    │   └──────┘    │  │└──────────┘│   │       │   - IsFallbackUp     │    │
+                        │   ┌───────┐    │               │  │┌──────────┐│   │       └──────────────────────┘    │     ┌───────────────────┐
+                        └───┤App*(3)├────┘               └──│┤Worker (3)├│───┘                                   └───► │Payments (Fallback)│
+                            └───────┘                       │└──────────┘│                                             └───────────────────┘
+                                                            └────────────┘       
+           Modelo de LB: Round Robin                                             
+                                                                                 
+           * Nota: Talvez o número de instâncias caia pra 2
+             pois a fila pode ficar grande demais e o teste
+             irá parar antes que todos sejam processados
+
+           ** Nota: O KeyDB é um banco em memória que
+              armazena a quantidade de requisições que
+              cada instância do Payments recebeu
+
+Pontos a serem considerados sobre o problema:
+
+1. Os serviços tem uma trava de 5s, ou seja, se mais de uma chamada de healthcheck for feita em menos de 5s, o serviço irá resetar o timer e contar mais 5s de travamento.
+2. Por conta da trava, se um worker pingar o serviço enquanto ele estiver travado, o worker irá receber um erro de timeout, e o próximo worker que pingar o serviço irá receber outra trava, assim por diante.
+
+Como o KeyDB Health Monitor soluciona esse problema:
+1. Iremos salvar uma chave chamada "default_healthcheck" e outra chamada "fallback_healthcheck" no KeyDB.
+2. Quando um worker processar uma requisição e o serviço (seja default ou fallback) falhar, o worker irá atualizar o valor da chave correspondente no KeyDB com o timestamp atual.
+3. Quando um próximo worker for processar uma requisição, ele irá verificar o valor da chave correspondente no KeyDB, se o timestamp for maior que 5s, o worker irá pingar o serviço.
+4. Se o worker receber um erro de timeout, ele irá atualizar o timestamp da chave correspondente no KeyDB com o timestamp atual, indicando que o serviço está travado.
+5. Se o worker receber uma resposta do serviço, ele irá excluir o valor da chave e atualizar a variavel que controla o status do seriço (IsPaymentsUp ou IsFallbackUp) para true.
+
+Dessa forma, garantimos que:
+1. Os serviços serão pingados com o menor tempo possível, porém sem causar requisições duplicadas, o que poderia causar travamentos infinitos.
+2. Os serviços serão monitorados por todos os Workers, ou seja, nenhum Worker será sobrecarregado com a responsabilidade de monitorar os serviços.
+3. Mesmo com os serviços travados, os Workers irão continuar processando as requisições, e o KeyDB Health Monitor irá garantir que os serviços sejam pingados novamente quando estiverem disponíveis.
