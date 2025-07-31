@@ -10,7 +10,7 @@ import (
 
 func FailOnError(err error, msg string) {
 	if err != nil {
-		log.Panicf("%s: %s", msg, err)
+		log.Printf("%s: %s", msg, err)
 	}
 }
 
@@ -44,7 +44,7 @@ func main() {
 	FailOnError(err, "Failed to declare a queue")
 
 	err = ch.Qos(
-		1,     // prefetch count
+		0,     // prefetch count
 		0,     // prefetch size
 		false, // global
 	)
@@ -78,10 +78,21 @@ func main() {
 
 	go func() {
 		for d := range msgs {
-			_, err = app.SendPayment(d.Body)
+
+			if !app.IsPaymentsUp && !app.IsFallbackUp {
+				d.Nack(false, true)
+				log.Println("Both payment services are down, requeuing message")
+				app.CheckServicesStatus()
+				continue
+			}
+
+			shouldAck, err := app.SendPayment(d.Body, d)
 			FailOnError(err, "Failed to send payment")
 			log.Printf("Done")
-			d.Ack(false)
+
+			if shouldAck {
+				d.Ack(false)
+			}
 		}
 	}()
 

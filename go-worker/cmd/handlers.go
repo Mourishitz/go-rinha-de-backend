@@ -6,6 +6,8 @@ import (
 	"errors"
 	"log"
 	"net/http"
+
+	"github.com/rabbitmq/amqp091-go"
 )
 
 type PaymentRequest struct {
@@ -14,56 +16,73 @@ type PaymentRequest struct {
 	RequestedAt   string  `json:"requestedAt"`
 }
 
-func (app *Config) SendPayment(body []byte) (any, error) {
+func (app *Config) SendPayment(body []byte, d amqp091.Delivery) (bool, error) {
 	if app.IsPaymentsUp {
-		log.Println("Sending payment request to payments service")
-		resp, err := http.Post(app.PaymentServiceURL+"/payments", "application/json", bytes.NewBuffer(body))
-		FailOnError(err, "Failed to send payment request to payments service")
-
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			log.Printf("Received non-OK response from payments service: %s", resp.Status)
-			return nil, errors.New("payments service returned non-OK status")
-		}
-
-		// Update summary in keyDB
-		var paymentReq PaymentRequest
-		err = json.Unmarshal(body, &paymentReq)
-		FailOnError(err, "Failed to unmarshal payment request body")
-
-		err = app.UpdateSummary(paymentReq.Amount, "payments")
-		FailOnError(err, "Failed to update summary in keyDB")
-
-		log.Println("Payment request sent successfully")
-		return nil, nil
+		return app.sendPaymentRequest(body, d)
 	}
 
 	if app.IsFallbackUp {
-		log.Println("Sending payment request to fallback service")
-		resp, err := http.Post(app.FallbackServiceURL+"/payments", "application/json", bytes.NewBuffer(body))
-		FailOnError(err, "Failed to send payment request to fallback service")
-
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			log.Printf("Received non-OK response from fallback service: %s", resp.Status)
-			return nil, errors.New("fallback service returned non-OK status")
-		}
-
-		// Update summary in keyDB
-		var paymentReq PaymentRequest
-		err = json.Unmarshal(body, &paymentReq)
-		FailOnError(err, "Failed to unmarshal payment request body")
-
-		err = app.UpdateSummary(paymentReq.Amount, "fallback")
-		FailOnError(err, "Failed to update summary in keyDB")
-
-		log.Println("Fallback request sent successfully")
-		return nil, nil
+		return app.sendFallbackPayment(body, d)
 	}
 
-	return nil, errors.New("both payments and fallback services are down")
+	return false, errors.New("both payments and fallback services are down")
+}
+
+func (app *Config) sendPaymentRequest(body []byte, d amqp091.Delivery) (bool, error) {
+	log.Println("Sending payment request to payments service")
+	resp, err := http.Post(app.PaymentServiceURL+"/payments", "application/json", bytes.NewBuffer(body))
+	FailOnError(err, "Failed to send payment request to payments service")
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("Received non-OK response from payments service: %s", resp.Status)
+		app.IsPaymentsUp = false
+		log.Println("Payments status: ", app.IsPaymentsUp)
+		if app.IsFallbackUp {
+			log.Println("Attempting to send payment request to fallback service")
+			return app.sendFallbackPayment(body, d)
+		}
+		return false, errors.New("payments service returned non-OK status")
+	}
+
+	// Update summary in keyDB
+	var paymentReq PaymentRequest
+	err = json.Unmarshal(body, &paymentReq)
+	FailOnError(err, "Failed to unmarshal payment request body")
+
+	err = app.UpdateSummary(paymentReq.Amount, "payments")
+	FailOnError(err, "Failed to update summary in keyDB")
+
+	log.Println("Payment request sent successfully")
+	return true, nil
+}
+
+func (app *Config) sendFallbackPayment(body []byte, d amqp091.Delivery) (bool, error) {
+	log.Println("Sending payment request to fallback service")
+	resp, err := http.Post(app.FallbackServiceURL+"/payments", "application/json", bytes.NewBuffer(body))
+	FailOnError(err, "Failed to send payment request to fallback service")
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("Received non-OK response from fallback service: %s", resp.Status)
+		app.IsFallbackUp = false
+		log.Println("Fallback status: ", app.IsFallbackUp)
+		d.Nack(false, true) // Requeue the message
+		return false, errors.New("fallback service returned non-OK status, requeuing message")
+	}
+
+	// Update summary in keyDB
+	var paymentReq PaymentRequest
+	err = json.Unmarshal(body, &paymentReq)
+	FailOnError(err, "Failed to unmarshal payment request body")
+
+	err = app.UpdateSummary(paymentReq.Amount, "fallback")
+	FailOnError(err, "Failed to update summary in keyDB")
+
+	log.Println("Fallback request sent successfully")
+	return true, nil
 }
 
 func (app *Config) UpdateSummary(amount float32, service string) error {
