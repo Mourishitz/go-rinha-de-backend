@@ -1,0 +1,17 @@
+Certo.... ca estamos de novo huh?
+
+
+O que me parece é, RabbitMQ não consegue rodar com requisitos de hardware tão baixos... (fracos)
+porém, como diria meu amigo Phoenix Wright:
+
+HOLD IT!
+
+Ainda temos uma segunda opção, que se pararmos para pensar é até mais inteligente para a nossa estrutura de projetos.
+
+Estamos de olho no KeyDB, que já é utilizado pelo nosso projeto como armazenamento em memória para valores como:
+
+- Quantidade total de requisições feitas em cada um dos dois serviços
+- Timestamp de que hora o último Health Check foi feito *(funçao do finado Doctor)
+
+E agora, vamos utilizar o KeyDB para armazenar as mensagens que seriam enviadas pelo RabbitMQ.
+Já temos funçoes totalmente desacopladas que processam o envio pelo proxy e o processamento pelos workers, então é só criar uma fila no KeyDB e pronto!
