@@ -1,11 +1,12 @@
 package main
 
 import (
-	"fmt"
+	"context"
+	"log"
 	"net/http"
 	"time"
 
-	amqp "github.com/rabbitmq/amqp091-go"
+	"github.com/redis/go-redis/v9"
 )
 
 func (app *Config) Payments(w http.ResponseWriter, r *http.Request) {
@@ -22,21 +23,21 @@ func (app *Config) Payments(w http.ResponseWriter, r *http.Request) {
 
 	app.writeNoContent(w)
 
-	app.rabbitMQChann.Publish(
-		"",
-		"payments_queue",
-		false,
-		false,
-		amqp.Publishing{
-			ContentType: "application/json",
-			Body: []byte(fmt.Sprintf(
-				`{"correlationId":"%s", "amount":%f, "requestedAt":"%s"}`,
-				requestPayload.CorrelationID,
-				requestPayload.Amount,
-				time.Now().Format("2006-01-02T15:04:05.000Z"),
-			)),
-		},
-	)
+	go func() {
+		ctx := context.Background()
+
+		_, err := app.KeyDBClient.XAdd(ctx, &redis.XAddArgs{
+			Stream: "payments_stream",
+			Values: map[string]any{
+				"correlationId": requestPayload.CorrelationID,
+				"amount":        requestPayload.Amount,
+				"requestedAt":   time.Now().Format(time.RFC3339Nano),
+			},
+		}).Result()
+		if err != nil {
+			log.Printf("Failed to push to payments_stream: %v", err)
+		}
+	}()
 }
 
 func (app *Config) PaymentsSummary(w http.ResponseWriter, r *http.Request) {
