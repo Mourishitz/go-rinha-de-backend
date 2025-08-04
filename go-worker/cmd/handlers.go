@@ -6,8 +6,6 @@ import (
 	"errors"
 	"log"
 	"net/http"
-
-	"github.com/rabbitmq/amqp091-go"
 )
 
 type PaymentRequest struct {
@@ -16,24 +14,24 @@ type PaymentRequest struct {
 	RequestedAt   string  `json:"requestedAt"`
 }
 
-func (app *Config) SendPayment(body []byte, d amqp091.Delivery) (bool, error) {
+func (app *Config) SendPayment(body []byte) (bool, error) {
 	if app.IsPaymentsUp {
-		return app.sendPaymentRequest(body, d)
+		return app.sendPaymentRequest(body)
 	}
 
 	if app.IsFallbackUp {
 		app.CheckServicesStatus("default")
 		if app.IsPaymentsUp {
 			log.Println("Payments service is back up, retrying payment request")
-			return app.sendPaymentRequest(body, d)
+			return app.sendPaymentRequest(body)
 		}
-		return app.sendFallbackPayment(body, d)
+		return app.sendFallbackPayment(body)
 	}
 
 	return false, errors.New("both payments and fallback services are down")
 }
 
-func (app *Config) sendPaymentRequest(body []byte, d amqp091.Delivery) (bool, error) {
+func (app *Config) sendPaymentRequest(body []byte) (bool, error) {
 	resp, err := http.Post(app.PaymentServiceURL+"/payments", "application/json", bytes.NewBuffer(body))
 	FailOnError(err, "Failed to send payment request to payments service")
 
@@ -45,7 +43,7 @@ func (app *Config) sendPaymentRequest(body []byte, d amqp091.Delivery) (bool, er
 		log.Println("Payments status: ", app.IsPaymentsUp)
 		if app.IsFallbackUp {
 			log.Println("Attempting to send payment request to fallback service")
-			return app.sendFallbackPayment(body, d)
+			return app.sendFallbackPayment(body)
 		}
 		return false, errors.New("payments service returned non-OK status")
 	}
@@ -60,7 +58,7 @@ func (app *Config) sendPaymentRequest(body []byte, d amqp091.Delivery) (bool, er
 	return true, nil
 }
 
-func (app *Config) sendFallbackPayment(body []byte, d amqp091.Delivery) (bool, error) {
+func (app *Config) sendFallbackPayment(body []byte) (bool, error) {
 	resp, err := http.Post(app.FallbackServiceURL+"/payments", "application/json", bytes.NewBuffer(body))
 	FailOnError(err, "Failed to send payment request to fallback service")
 
@@ -70,7 +68,6 @@ func (app *Config) sendFallbackPayment(body []byte, d amqp091.Delivery) (bool, e
 		log.Printf("Received non-OK response from fallback service: %s", resp.Status)
 		app.IsFallbackUp = false
 		log.Println("Fallback status: ", app.IsFallbackUp)
-		d.Nack(false, true) // Requeue the message
 		return false, errors.New("fallback service returned non-OK status, requeuing message")
 	}
 

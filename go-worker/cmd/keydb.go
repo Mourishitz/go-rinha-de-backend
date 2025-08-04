@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -49,4 +50,21 @@ func (app *Config) ReadTotalAmount(service string) (float32, error) {
 	}
 
 	return value, nil
+}
+
+func (app *Config) NackAndRequeue(ctx context.Context, stream, group, consumer, messageID string, values map[string]interface{}) error {
+	err := app.KeyDBClient.XAck(ctx, stream, group, messageID).Err()
+	if err != nil {
+		return fmt.Errorf("failed to ack original message during nack: %w", err)
+	}
+
+	_, err = app.KeyDBClient.XAdd(ctx, &redis.XAddArgs{
+		Stream: stream,
+		Values: values,
+	}).Result()
+	if err != nil {
+		return fmt.Errorf("failed to requeue message during nack: %w", err)
+	}
+
+	return nil
 }

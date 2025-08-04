@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"log"
 	"os"
+	"strconv"
+	"time"
 
-	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -17,7 +20,6 @@ func FailOnError(err error, msg string) {
 type Config struct {
 	PaymentServiceURL  string
 	FallbackServiceURL string
-	DoctorServiceURL   string
 	KeyDBServiceURL    string
 	KeyDBClient        *redis.Client
 	IsPaymentsUp       bool
@@ -25,48 +27,11 @@ type Config struct {
 }
 
 func main() {
-	conn, err := amqp.Dial(os.Getenv("RABBITMQ_URL"))
-	FailOnError(err, "Failed to connect to RabbitMQ")
-	defer conn.Close()
-
-	ch, err := conn.Channel()
-	FailOnError(err, "Failed to open a channel")
-	defer ch.Close()
-
-	q, err := ch.QueueDeclare(
-		"payments_queue",
-		true,
-		false,
-		false,
-		false,
-		nil,
-	)
-	FailOnError(err, "Failed to declare a queue")
-
-	err = ch.Qos(
-		1,     // prefetch count
-		0,     // prefetch size
-		false, // global
-	)
-	FailOnError(err, "Failed to set QoS")
-
-	msgs, err := ch.Consume(
-		q.Name,                   // queue
-		os.Getenv("INSTANCE_ID"), // consumer
-		false,                    // auto-ack
-		false,                    // exclusive
-		false,                    // no-local
-		false,                    // no-wait
-		nil,                      // args
-	)
-	FailOnError(err, "Failed to register a consumer")
-
-	var forever chan struct{}
+	ctx := context.Background()
 
 	app := Config{
 		PaymentServiceURL:  os.Getenv("PAYMENT_PROCESSOR_DEFAULT_URL"),
 		FallbackServiceURL: os.Getenv("PAYMENT_PROCESSOR_FALLBACK_URL"),
-		DoctorServiceURL:   os.Getenv("DOCTOR_SERVICE_URL"),
 		KeyDBServiceURL:    os.Getenv("KEYDB_SERVICE_URL"),
 		KeyDBClient: redis.NewClient(&redis.Options{
 			Addr: os.Getenv("KEYDB_SERVICE_URL"),
@@ -76,25 +41,85 @@ func main() {
 		IsFallbackUp: true,
 	}
 
-	go func() {
-		for d := range msgs {
+	stream := "payments_stream"
+	group := "payments_group"
+	consumer := "worker-" + os.Getenv("INSTANCE_ID")
 
-			if !app.IsPaymentsUp && !app.IsFallbackUp {
-				d.Nack(false, true)
-				app.CheckServicesStatus("default")
-				app.CheckServicesStatus("fallback")
+	err := app.KeyDBClient.XGroupCreateMkStream(ctx, stream, group, "$").Err()
+	if err != nil && err.Error() != "BUSYGROUP Consumer Group name already exists" {
+		log.Fatalf("Failed to create consumer group: %v", err)
+	}
+
+	log.Println("[*] Consuming from payments stream using consumer group: ", group)
+
+	for {
+		streams, err := app.KeyDBClient.XReadGroup(ctx, &redis.XReadGroupArgs{
+			Group:    group,
+			Consumer: consumer,
+			Streams:  []string{stream, ">"},
+			Count:    1,
+			Block:    5 * time.Second,
+		}).Result()
+
+		if err != nil && err != redis.Nil {
+			log.Printf("Error reading from stream: %v", err)
+			time.Sleep(1 * time.Second)
+			continue
+		}
+
+		if len(streams) == 0 || len(streams[0].Messages) == 0 {
+			continue
+		}
+
+		for _, msg := range streams[0].Messages {
+			values := make(map[string]any)
+			for k, v := range msg.Values {
+				switch k {
+				case "amount":
+					// Try to convert string to float32
+					if strVal, ok := v.(string); ok {
+						f, err := strconv.ParseFloat(strVal, 32)
+						if err == nil {
+							values[k] = float32(f)
+							continue
+						}
+						log.Printf("Invalid float value for 'amount': %v", strVal)
+					}
+					// fallback if something goes wrong
+					values[k] = 0.0
+				default:
+					values[k] = v
+				}
+			}
+			jsonBytes, err := json.Marshal(values)
+			if err != nil {
+				log.Printf("Failed to marshal message: %v", err)
+				app.KeyDBClient.XAck(ctx, stream, group, msg.ID)
 				continue
 			}
 
-			shouldAck, err := app.SendPayment(d.Body, d)
-			FailOnError(err, "Failed to send payment")
+			if !app.IsPaymentsUp && !app.IsFallbackUp {
+				app.NackAndRequeue(ctx, stream, group, consumer, msg.ID, msg.Values)
+				app.sendHealthCheckRequest("default")
+				app.sendHealthCheckRequest("fallback")
+				continue
+			}
+			shouldAck, err := app.SendPayment(jsonBytes)
+			if err != nil {
+				FailOnError(err, "Failed to send payment")
+			}
 
 			if shouldAck {
-				d.Ack(false)
+				err = app.KeyDBClient.XAck(ctx, stream, group, msg.ID).Err()
+				if err != nil {
+					log.Printf("Failed to ack message %s: %v", msg.ID, err)
+				}
+			} else {
+				err = app.NackAndRequeue(ctx, stream, group, consumer, msg.ID, msg.Values)
+				if err != nil {
+					log.Printf("Failed to nack & requeue message %s: %v", msg.ID, err)
+				}
 			}
 		}
-	}()
-
-	log.Printf(" [*] Consuming from " + q.Name + " queue.")
-	<-forever
+	}
 }

@@ -28,7 +28,6 @@ services:
       - APP_PORT=8080
       - KEYDB_SERVICE_URL=keydb:6379
       - INSTANCE_ID=1
-      - RABBITMQ_URL=amqp://rinha:rinha@rabbitmq:5672/
     deploy:
       resources:
         limits:
@@ -37,8 +36,7 @@ services:
     networks:
       - rinha-backend
     depends_on:
-      broker:
-        condition: service_healthy
+      - keydb
 
   api2:
     <<: *api
@@ -48,24 +46,6 @@ services:
       - APP_PORT=8080
       - KEYDB_SERVICE_URL=keydb:6379
       - INSTANCE_ID=2
-      - RABBITMQ_URL=amqp://rinha:rinha@rabbitmq:5672/
-
-  broker:
-    image: rabbitmq:4-management
-    container_name: rabbitmq
-    ports:
-      - "5672:5672" # AMQP protocol
-      - "15672:15672" # Management UI
-    networks:
-      - rinha-backend
-    environment:
-      RABBITMQ_DEFAULT_USER: rinha
-      RABBITMQ_DEFAULT_PASS: rinha
-    healthcheck:
-      test: rabbitmq-diagnostics -q ping
-      interval: 5s
-      timeout: 5s
-      retries: 3
 
   keydb:
     image: eqalpha/keydb:alpine
@@ -88,18 +68,16 @@ services:
       - PAYMENT_PROCESSOR_FALLBACK_URL=http://payment-processor-fallback:8080
       - KEYDB_SERVICE_URL=keydb:6379
       - INSTANCE_ID=worker-1
-      - RABBITMQ_URL=amqp://rinha:rinha@rabbitmq:5672/
     deploy:
       resources:
         limits:
           cpus: "0.55"
-          memory: "30MB"
+          memory: "300MB"
     networks:
       - rinha-backend
       - payment-processor
     depends_on:
-      broker:
-        condition: service_healthy
+      - keydb
 
   worker2:
     <<: *worker
@@ -110,10 +88,8 @@ services:
       - PAYMENT_PROCESSOR_FALLBACK_URL=http://payment-processor-fallback:8080
       - KEYDB_SERVICE_URL=keydb:6379
       - INSTANCE_ID=worker-2
-      - RABBITMQ_URL=amqp://rinha:rinha@rabbitmq:5672/
     depends_on:
-      broker:
-        condition: service_healthy
+      - keydb
 
   worker3:
     <<: *worker
@@ -124,10 +100,8 @@ services:
       - PAYMENT_PROCESSOR_FALLBACK_URL=http://payment-processor-fallback:8080
       - KEYDB_SERVICE_URL=keydb:6379
       - INSTANCE_ID=worker-3
-      - RABBITMQ_URL=amqp://rinha:rinha@rabbitmq:5672/
     depends_on:
-      broker:
-        condition: service_healthy
+      - keydb
 
 networks:
   rinha-backend:
