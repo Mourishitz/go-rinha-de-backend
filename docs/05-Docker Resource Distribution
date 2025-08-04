@@ -1,0 +1,19 @@
+Os limites de Hardware são:
+
+CPU: 1.5 Cores
+Memória: 350MB
+
+Estrutura:
+
+1. Load Balancer (NGinx)
+2. 2x Instâncias de API (Proxy em Golang)
+3. 1x Instância de Banco em memória (KeyDB)
+4. 3x Instâncias de Worker (Golang)
+5. Broker (RabbitMQ)
+
+
+Distribuição de Recursos (Respeitando os limites de Hardware):
+- Load Balancer (NGinx): 0.15 Cores, 15MB Mem
+- API Proxy (Golang): 0.25 Cores, 30MB Mem (Total: 0.5 Cores, 90MB Mem)
+- Banco de Dados (KeyDB): 0.25 Cores, 100MB Mem
+
