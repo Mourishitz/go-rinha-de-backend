@@ -1,0 +1,40 @@
+name: Build and Publish Go Docker Images
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_OWNER: mourishitz
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry (GHCR)
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push go-proxy
+        run: |
+          IMAGE_NAME=${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/go-proxy
+          docker build -f docker/go/GoProxy.dockerfile -t $IMAGE_NAME:latest ./docker/go
+          docker push $IMAGE_NAME:latest
+
+      - name: Build and push go-worker
+        run: |
+          IMAGE_NAME=${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/go-worker
+          docker build -f docker/go/GoWorker.dockerfile -t $IMAGE_NAME:latest ./docker/go
+          docker push $IMAGE_NAME:latest

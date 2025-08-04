@@ -14,7 +14,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.15"
+          cpus: "0.10"
           memory: "15MB"
 
   api1: &api
@@ -31,7 +31,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.55"
+          cpus: "0.20"
           memory: "30MB"
     networks:
       - rinha-backend
@@ -55,6 +55,11 @@ services:
     networks:
       - rinha-backend
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: "200MB"
 
   worker1: &worker
     container_name: worker-1
@@ -71,8 +76,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.55"
-          memory: "300MB"
+          cpus: "0.25"
+          memory: "25MB"
     networks:
       - rinha-backend
       - payment-processor
