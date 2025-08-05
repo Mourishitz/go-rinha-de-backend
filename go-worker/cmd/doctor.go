@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -9,13 +8,12 @@ import (
 )
 
 func (app *Config) CheckServicesStatus(service string) {
-	ctx := context.Background()
 	key := service + "_last_check"
 
-	lastCheck, err := app.KeyDBClient.Get(ctx, key).Time()
+	lastCheck, err := app.KeyDBClient.Get(app.Context, key).Time()
 	if err != nil {
 		log.Printf("Initializing last check time for %s service", service)
-		err = app.KeyDBClient.Set(ctx, key, time.Now(), 0).Err()
+		err = app.KeyDBClient.Set(app.Context, key, time.Now(), 0).Err()
 		if err != nil {
 			log.Printf("Failed to set initial last check time for %s: %v", service, err)
 		}
@@ -26,7 +24,7 @@ func (app *Config) CheckServicesStatus(service string) {
 		return
 	}
 
-	err = app.KeyDBClient.Set(ctx, key, time.Now(), 0).Err()
+	err = app.KeyDBClient.Set(app.Context, key, time.Now(), 0).Err()
 	if err != nil {
 		log.Printf("Failed to update last check time for %s: %v", service, err)
 		return
@@ -80,8 +78,7 @@ func (app *Config) sendHealthCheckRequest(service string) {
 }
 
 func (app *Config) UpdateLastCheckTime(service string) {
-	ctx := context.Background()
 	key := service + "_last_check"
 
-	_ = app.KeyDBClient.Set(ctx, key, time.Now(), 0).Err()
+	_ = app.KeyDBClient.Set(app.Context, key, time.Now(), 0).Err()
 }

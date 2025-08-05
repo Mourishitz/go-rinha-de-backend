@@ -26,17 +26,17 @@ services:
     restart: always
     environment:
       - APP_PORT=8080
-      - KEYDB_SERVICE_URL=keydb:6379
       - INSTANCE_ID=1
+      - KEYDB_SERVICE_URL=keydb:6379
+    networks:
+      - rinha-backend
+    depends_on:
+      - keydb
     deploy:
       resources:
         limits:
           cpus: "0.20"
           memory: "30MB"
-    networks:
-      - rinha-backend
-    depends_on:
-      - keydb
 
   api2:
     <<: *api
@@ -44,8 +44,8 @@ services:
     hostname: api2
     environment:
       - APP_PORT=8080
-      - KEYDB_SERVICE_URL=keydb:6379
       - INSTANCE_ID=2
+      - KEYDB_SERVICE_URL=keydb:6379
 
   keydb:
     image: eqalpha/keydb:alpine
@@ -73,16 +73,16 @@ services:
       - PAYMENT_PROCESSOR_FALLBACK_URL=http://payment-processor-fallback:8080
       - KEYDB_SERVICE_URL=keydb:6379
       - INSTANCE_ID=worker-1
-    deploy:
-      resources:
-        limits:
-          cpus: "0.25"
-          memory: "25MB"
     networks:
       - rinha-backend
       - payment-processor
     depends_on:
       - keydb
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: "25MB"
 
   worker2:
     <<: *worker

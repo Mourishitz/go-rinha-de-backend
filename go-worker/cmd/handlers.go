@@ -6,10 +6,13 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"time"
+
+	"github.com/redis/go-redis/v9"
 )
 
 type PaymentRequest struct {
-	Amount        float32 `json:"amount"`
+	Amount        float64 `json:"amount"`
 	CorrelationID string  `json:"correlationId"`
 	RequestedAt   string  `json:"requestedAt"`
 }
@@ -37,7 +40,7 @@ func (app *Config) sendPaymentRequest(body []byte) (bool, error) {
 
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusInternalServerError {
+	if resp.StatusCode != http.StatusOK {
 		log.Printf("Received non-OK response from payments service: %s", resp.Status)
 		app.IsPaymentsUp = false
 		log.Println("Payments status: ", app.IsPaymentsUp)
@@ -55,6 +58,8 @@ func (app *Config) sendPaymentRequest(body []byte) (bool, error) {
 
 	err = app.UpdateSummary(paymentReq.Amount, "payments")
 	FailOnError(err, "Failed to update summary in keyDB")
+	err = app.SaveProcessedPayment("default", paymentReq.Amount, paymentReq.RequestedAt)
+	FailOnError(err, "Failed to save processed payment in keyDB")
 	return true, nil
 }
 
@@ -64,7 +69,7 @@ func (app *Config) sendFallbackPayment(body []byte) (bool, error) {
 
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusInternalServerError {
+	if resp.StatusCode != http.StatusOK {
 		log.Printf("Received non-OK response from fallback service: %s", resp.Status)
 		app.IsFallbackUp = false
 		log.Println("Fallback status: ", app.IsFallbackUp)
@@ -78,17 +83,41 @@ func (app *Config) sendFallbackPayment(body []byte) (bool, error) {
 
 	err = app.UpdateSummary(paymentReq.Amount, "fallback")
 	FailOnError(err, "Failed to update summary in keyDB")
+	err = app.SaveProcessedPayment("fallback", paymentReq.Amount, paymentReq.RequestedAt)
+	FailOnError(err, "Failed to save processed payment in keyDB")
 	return true, nil
 }
 
-func (app *Config) UpdateSummary(amount float32, service string) error {
-	totalRequests, err := app.ReadAllRequests(service)
-	FailOnError(err, "Failed to read total requests from keyDB")
-	totalAmount, err := app.ReadTotalAmount(service)
-	FailOnError(err, "Failed to read total amount from keyDB")
-
-	app.WriteToKeyDB(service+"_total_requests", totalRequests+1)
-	app.WriteToKeyDB(service+"_total_amount", totalAmount+amount)
-
+func (app *Config) UpdateSummary(amount float64, service string) error {
+	app.KeyDBClient.IncrBy(app.Context, service+"_total_requests", 1)
+	app.KeyDBClient.IncrByFloat(app.Context, service+"_total_amount", amount)
 	return nil
+}
+
+func (app *Config) SaveProcessedPayment(service string, amount float64, requestedAt string) error {
+	type Payment struct {
+		Amount      float64 `json:"amount"`
+		RequestedAt string  `json:"requestedAt"`
+	}
+
+	t, err := time.Parse(time.RFC3339, requestedAt)
+	if err != nil {
+		return err
+	}
+
+	entry := Payment{
+		Amount:      amount,
+		RequestedAt: requestedAt,
+	}
+	jsonValue, err := json.Marshal(entry)
+	if err != nil {
+		return err
+	}
+
+	score := float64(t.UnixMilli())
+
+	return app.KeyDBClient.ZAdd(app.Context, service+"_payments_processed_zset", redis.Z{
+		Score:  score,
+		Member: jsonValue,
+	}).Err()
 }

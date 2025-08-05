@@ -1,0 +1,7 @@
+Eu estava usando streams e consumer groups para consumir os pagamentos "em fila", porém, além de custoso demais, notei que o mesmo podia ser feito com as filas do KeyDB
+Portanto, vamos alterar o código para usar filas do KeyDB ao invés de streams e consumer groups.
+
+O nosso app proxy irá dar um LPUSH na fila de pagamentos, e o worker irá dar um RPOP para processar os pagamentos.
+
+Dessa forma, o worker irá processar os pagamentos na ordem que foram recebidos, e não mais em paralelo como era feito com os consumer groups.
+Também iremos alterar as amounts de float32 para float64 por conta de uma inconsistência que estava acontecendo com os valores dos pagamentos.

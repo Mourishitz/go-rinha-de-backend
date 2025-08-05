@@ -1,0 +1,14 @@
+Algo que notei somente depois de ter meras *4000* inconsistencias por leva de testes é que
+
+Eu simplesmente esqueci de implementar um filtro "obrigatorio" de `from` e `to` nas transações concluídas.
+
+Só tem um pequeno problema... Os pagamentos são subidos em uma fila pelo proxy e, posteriormente, processados pelo worker com um "RPop" que remove o pagamento da fila...
+
+Ou seja, vamos ter que criar um "banco de dados" para esses caras no nosso KeyDB
+
+Pra isso, criamos dois z sets no KeyDB, uma para `default_processed_zset` e outra para `fallback_processed_zset`
+
+os z sets contém a quantia e a timestamp de quando o pagamento foi processado para ambos os serviços de fallback e default
+
+
+assim, os filtros garantem que não haverá inconsistências entre os pagamentos processados, corrigindo assim o issue #1 

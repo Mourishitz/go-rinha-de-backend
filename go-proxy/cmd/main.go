@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 )
 
 type Config struct {
+	Context     context.Context
 	instance    string
 	KeyDBClient *redis.Client
 }
@@ -22,6 +24,7 @@ func FailOnError(err error, msg string) {
 
 func main() {
 	app := Config{
+		Context:  context.Background(),
 		instance: os.Getenv("INSTANCE_ID"),
 		KeyDBClient: redis.NewClient(&redis.Options{
 			Addr: os.Getenv("KEYDB_SERVICE_URL"),
