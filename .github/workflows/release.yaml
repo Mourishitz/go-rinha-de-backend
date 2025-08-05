@@ -29,12 +29,12 @@ jobs:
 
       - name: Build and push go-proxy
         run: |
-          IMAGE_NAME=${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/go-proxy
+          IMAGE_NAME=${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/go-rinha-de-backend/go-proxy
           docker build -f docker/go/GoProxy.dockerfile -t $IMAGE_NAME:latest ./docker/go
           docker push $IMAGE_NAME:latest
 
       - name: Build and push go-worker
         run: |
-          IMAGE_NAME=${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/go-worker
+          IMAGE_NAME=${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/go-rinha-de-backend/go-worker
           docker build -f docker/go/GoWorker.dockerfile -t $IMAGE_NAME:latest ./docker/go
           docker push $IMAGE_NAME:latest
