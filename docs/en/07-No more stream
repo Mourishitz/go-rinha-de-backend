@@ -1,0 +1,8 @@
+I was using streams and consumer groups to consume payments “in queue,” but in addition to being too costly, I noticed the same could be achieved with KeyDB queues.  
+Therefore, we will update the code to use KeyDB queues instead of streams and consumer groups.  
+
+Our proxy app will perform an LPUSH to the payment queue, and the worker will perform an RPOP to process the payments.  
+
+This way, the worker will process the payments in the order they were received, rather than in parallel as was done with consumer groups.  
+We will also change the `amount` values from float32 to float64 due to an inconsistency that was occurring with payment amounts.  
+

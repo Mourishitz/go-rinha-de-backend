@@ -1,0 +1,18 @@
+Hardware Limits:
+
+CPU: 1.5 Cores  
+Memory: 350MB  
+
+Structure:
+
+1. Load Balancer (NGinx)  
+2. 2× API Instances (Proxy in Golang)  
+3. 1× In-memory Database Instance (KeyDB)  
+4. 3× Worker Instances (Golang)  
+5. Broker (RabbitMQ)  
+
+Resource Allocation (Respecting Hardware Limits):  
+- Load Balancer (NGinx): 0.15 Cores, 15MB Memory  
+- API Proxy (Golang): 0.25 Cores, 30MB Memory (Total: 0.5 Cores, 90MB Memory)  
+- Database (KeyDB): 0.25 Cores, 100MB Memory  
+

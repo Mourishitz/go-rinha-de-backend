@@ -1,0 +1,120 @@
+Endpoints Overview
+
+The tables below provide an overview to facilitate the understanding of the solution.
+
+Endpoints that need to be developed
+┌──────────────────────┐┌───────────────────────────────────────────────────────────────┐
+│ Endpoints 	       ││ Description                                                   │
+└──────────────────────┘└───────────────────────────────────────────────────────────────┘
+┌──────────────────────┐┌───────────────────────────────────────────────────────────────┐
+│ POST /payments       ││ Proxys a payment request                                      │
+├──────────────────────┤├───────────────────────────────────────────────────────────────┤
+│ GET /payments-summary││ Shows details of all the payments requests                    │
+└──────────────────────┘└───────────────────────────────────────────────────────────────┘
+
+
+Endpoints available in the Payment Processor Default service
+
+┌───────────────────────────────────┐┌──────────────────────────────────────────────────────────────────────────────────────────┐
+│ Endpoints 	                    ││ Description                                                                              │
+└───────────────────────────────────┘└──────────────────────────────────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────┐┌──────────────────────────────────────────────────────────────────────────────────────────┐
+│ POST /payments                    ││ Requests a payment to be processed                                                       │
+├───────────────────────────────────┤├──────────────────────────────────────────────────────────────────────────────────────────┤
+│ GET /payments/service-health      ││ Verifies the health of the Payments service.                                             │ 
+├───────────────────────────────────┤├──────────────────────────────────────────────────────────────────────────────────────────┤
+│ GET /payments/{id}                ││ Shows details of a payment request                                                       │
+├───────────────────────────────────┤├──────────────────────────────────────────────────────────────────────────────────────────┤
+│ GET /admin/payments-summary       ││ Shows details of all the payments requests                                               │
+├───────────────────────────────────┤├──────────────────────────────────────────────────────────────────────────────────────────┤
+│ PUT /admin/configurations/token   ││ Configures the token used to authenticate the Payments service on `admin` routes.        │ 
+├───────────────────────────────────┤├──────────────────────────────────────────────────────────────────────────────────────────┤
+│ PUT /admin/configurations/delay   ││ Configures the delay for the payments service                                            │ 
+├───────────────────────────────────┤├──────────────────────────────────────────────────────────────────────────────────────────┤
+│ PUT /admin/configurations/failure ││ Configures the failure for the payments service                                          │ 
+├───────────────────────────────────┤├──────────────────────────────────────────────────────────────────────────────────────────┤
+│ POST /admin/purge-payments        ││ Purges all payments requests from the system. This is useful for testing purposes.       │ 
+└───────────────────────────────────┘└──────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+
+Payments Routes
+
+/payments
+```
+POST /payments
+{
+    "correlationId": "4a7901b8-7d26-4d9d-aa19-4dc1c7cf60b3",
+    "amount": 19.90,
+    "requestedAt" : "2025-07-15T12:34:56.000Z"
+}
+
+HTTP 200 - Ok
+{
+    "message": "payment processed successfully"
+}
+
+```
+This endpoint receives and processes a payment request – it is similar to the Payments endpoint that your backend needs to provide. It is the main endpoint for you to integrate with your backend.
+
+request
+
+    correlationId is a required and unique field of type UUID.
+    amount is a required field of type decimal.
+    requestedAt is a required field of type timestamp in ISO format in UTC.
+
+response
+
+    message is always present and of type text
+
+
+
+Health Check
+/payments/service-health
+```
+GET /payments/service-health
+
+HTTP 200 - Ok
+{
+    "failing": false,
+    "minResponseTime": 100
+}
+```
+request - There are no parameters for the request. However, this endpoint imposes a limit on calls – 1 call every 5 seconds. 
+If this limit is exceeded, you will receive an error response of type HTTP 429 - Too Many Requests.
+
+response
+
+    failing is a field that is always present of type boolean indicating whether the Payments endpoint is available. If it is not available, it means that requests to the endpoint will receive HTTP 5XX errors.
+
+    minResponseTime is a field that is always present of type integer indicating the best possible response time for the Payments endpoint.
+    For example, if the returned value is 100, there will be no responses faster than 100ms.
+
+
+
+
+Payment Details
+
+You do not need to integrate with this endpoint. It is for troubleshooting purposes, in case you want/need it.
+
+GET /payments/{id}
+```
+HTTP 200 - Ok
+{
+    "correlationId": "4a7901b8-7d26-4d9d-aa19-4dc1c7cf60b3",
+    "amount": 19.90,
+    "requestedAt" : 2025-07-15T12:34:56.000Z
+}
+```
+
+requisição - {id} é um parâmetro obrigatório do tipo UUID.
+
+resposta
+
+    correlationId é um campo sempre presente do tipo UUID.
+    amount é um campo sempre presente do tipo decimal.
+    requestedAt é um campo sempre presente do tipo timestamp no formato ISO em UTC
+
+
+
+

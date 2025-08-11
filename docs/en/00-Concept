@@ -1,0 +1,83 @@
+The service to be developed will be a "proxy"
+
+It will interact with two instances of a payment processor that will experience random instabilities, including delays and unavailability.
+
+It will implement asynchronous processing
+
+
+                                                   ┌─────────┐
+                                               ┌──►│Worker #1├───┐                            ┌──────────────────────────┐
+                                               │   └─────────┘   │                        ┌──►│Payment Processor Default │
+                                               │                 │                        │   └──────────────────────────┘
+   ┌──────┐        ┌────────┐        ┌──────┐  │   ┌─────────┐   │      ┌─────────────┐   │
+   │Client├───────►│API Http├────────┤Broker├──┼──►│Worker #2│───┼──────┤Load Balancer├───┤
+   └──────┘        └────────┘        └──────┘  │   └─────────┘   │      └─────────────┘   │   ┌──────────────────────────┐
+                                               │                 │                        └──►│Payment Processor Fallback│
+                                               │   ┌─────────┐   │                            └──────────────────────────┘
+                                               └──►│Worker #3├───┘
+                                                   └─────────┘
+
+
+Example of Request from Client─►API
+
+/payments
+
+``` 
+POST /payments
+{
+    "correlationId": "4a7901b8-7d26-4d9d-aa19-4dc1c7cf60b3",
+    "amount": 19.90
+}
+
+HTTP 2XX
+Anything
+```
+
+Where `correlationId` is a unique UUID and `amount` is a required decimal value (fuck).
+
+
+
+/payments-summary
+
+```
+GET /payments-summary?from=2020-07-10T12:34:56.000Z&to=2020-07-10T12:35:56.000Z
+
+HTTP 200 - Ok
+{
+    "default" : {
+        "totalRequests": 43236,
+        "totalAmount": 415542345.98
+    },
+    "fallback" : {
+        "totalRequests": 423545,
+        "totalAmount": 329347.34
+    }
+}
+```
+from and to are ISO timestamps (3 hours ahead from Brasil)
+both optional
+
+
+this fields need to be int and decimal
+
+IMPORTANT: The payment services also have a payments-summary endpoint
+During the test, the API and the services will be called, and the responses must be an exact match or else it will punish you for inconsistency
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

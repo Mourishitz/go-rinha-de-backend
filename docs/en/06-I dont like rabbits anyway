@@ -1,0 +1,17 @@
+Alright… here we are again, huh?  
+
+It seems to me that RabbitMQ can’t really run with such low (weak) hardware requirements…  
+However, as my friend Phoenix Wright would say:  
+
+HOLD IT!  
+
+We still have a second option, which, if we think about it, is actually smarter for our project structure.  
+
+We’ve got our eyes on KeyDB, which is already being used by our project as in-memory storage for values such as:  
+
+- Total number of requests made to each of the two services  
+- Timestamp of when the last Health Check was performed *(function of the late Doctor)*  
+
+And now, we’re going to use KeyDB to store the messages that would have been sent by RabbitMQ.  
+We already have fully decoupled functions that handle sending via the proxy and processing by the workers, so we just need to create a queue in KeyDB and we’re done!  
+

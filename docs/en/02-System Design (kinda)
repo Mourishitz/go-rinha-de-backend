@@ -1,0 +1,35 @@
+Challenge Overview:  
+- The system is a proxy that interacts with two payment processors: a primary and a fallback.  
+- The goal is to process as many requests as possible on the primary processor and use the fallback only when necessary.  
+- The fallback charges twice as much in fees as the primary, so minimizing its use is important.  
+- A load balancer is mandatory, and at least two proxy instances are required.  
+- The system must be able to handle random delays and failures (which will happen).  
+- Hardware limitations are:  
+  - 1.5 CPUs  
+  - 350MB RAM  
+
+Key points:  
+- The fewer requests sent to the fallback, the better.  
+- The proxy should be as lightweight as possible to avoid consuming excessive resources.  
+- The summary request should prioritize consistency; it does not need to be the most performant.  
+
+My implementation suggestions:  
+
+- 1: Implement a main load balancer (Gateway) that distributes requests between two instances of the System (proxy).  
+- 1.1: There will be a third system called Doctor, which will check every 5 seconds whether the primary payment processor is working correctly.  
+- 1.2: If the Doctor detects that the primary payment processor is down, it will (via a Server Stream RPC) notify the System (proxy) instances that the primary payment processor is down.  
+- 1.3: When the Doctor detects that the primary payment processor is back up, it will notify the System (proxy) instances again that the primary is up.  
+- 1.4: The System (proxy) will store the state of the primary payment processor and, if it is down, will redirect requests to the fallback payment processor.  
+- 2: The System (proxy) will only handle requests passed through the Gateway and then forward them to whichever payment processor is up.  
+- 2.1: The System (proxy) will not store state; it will not store past requests.  
+- 2.2: The System (proxy) will store the state of the primary payment processor, and if it is down, will redirect requests to the fallback payment processor.  
+- 2.3: If a summary request is made, the proxy will fetch information from both payment processors.  
+
+Challenges/difficulties:  
+- Making all systems as lightweight as possible to avoid consuming excessive resources.  
+- Implementing the load balancer so that it distributes requests fairly among the System (proxy) instances.  
+- Implementing the monitoring system (Doctor) that checks the state of the primary payment processor and notifies the System (proxy) instances when it is down or up.  
+- Handling random failures and delays from the payment processors, ensuring that the system continues functioning even when one of them is unavailable.  
+
+See: ./assets/system_design.png  
+

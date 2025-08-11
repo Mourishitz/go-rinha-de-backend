@@ -1,0 +1,47 @@
+The previous system design was this: ./assets/system-design.png
+
+It consisted of:
+
+- 1 Gateway (NGinx) that would load balance between 3 instances of the server (App)  
+- 3 instances of the server (App) that would process requests  
+- 1 instance of a health check service (Doctor) that would check the status of each Payments service  
+- 1 instance of Payments (Default) that would process payments  
+- 1 instance of Payments (Fallback) that would only process when Payments (Default) failed  
+
+However, I noticed these problems:
+
+1. If both Payments services failed, the entire system would stop.  
+2. If the App received a message from the Doctor saying that Payments was down, it wouldn’t update the state variable in time, causing the App to lose the current request.  
+3. The App would be doing more than one thing at once (receiving requests, listening for Doctor updates, sending status to Doctor, and sending requests to Payments).  
+4. The App wasn’t counting how many requests each Payments instance had received, which is one of the prerequisites.  
+
+So, I came up with the new system design strategy:
+
+                                                               Doctor will constantly update and be updated
+                                                               about the status of both Payments services
+                                             ┌───────┐                      ┌──────┐
+                                ┌───────────►│KeyDB**│◄─────────┐   ┌──────►│Doctor│◄───────────┐
+                                │            └───────┘          ▼   ▼       └──────┘            │
+                                ▼                           ┌────────────┐                      │
+                            ┌───────┐                       │┌──────────┐│                      │                      ┌───────────────────┐
+                        ┌───┤App (1)├────┐               ┌──│┤Worker (1)├│───┐                  ▼                ┌───► │Payments (Default) │
+                        │   └───────┘    │               │  │└──────────┘│   │       ┌──────────────────────┐    │     └───────────────────┘
+           ┌───────┐    │   ┌───────┐    │   ┌──────┐    │  │┌──────────┐│   │       │Checks the variables: │    │
+           │Gateway├────┼───┤App (2)├────┼───┤Broker├────┼──│┤Worker (2)├│───┼──────►│   - IsPaymentsUp     │────┤
+           └───────┘    │   └───────┘    │   └──────┘    │  │└──────────┘│   │       │   - IsFallbackUp     │    │
+                        │   ┌───────┐    │               │  │┌──────────┐│   │       └──────────────────────┘    │     ┌───────────────────┐
+                        └───┤App*(3)├────┘               └──│┤Worker (3)├│───┘                                   └───► │Payments (Fallback)│
+                            └───────┘                       │└──────────┘│                                             └───────────────────┘
+                                                            └────────────┘       
+           LB model: Round Robin                                             
+                                                                                 
+           * Note: The number of instances may drop to 2
+             because the queue might get too large and the test
+             might stop before all are processed.
+
+           ** Note: KeyDB is an in-memory database that
+              stores the number of requests each Payments
+              instance has received.
+
+The infallible plan!
+

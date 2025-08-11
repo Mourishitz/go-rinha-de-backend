@@ -1,0 +1,72 @@
+OK, my project would be using a small microservice called Doctor, responsible for checking the health of the services.  
+However, after some tests (without the Doctor), I noticed that resources were starting to become scarce, so I decided to remove the Doctor service from the project.  
+
+Even though Doctor was a very lightweight service and used Protobufers and gRPC for performance and efficiency, I realized it could be “replaced” by something similar.  
+
+Introducing: KeyDB Health Monitor  
+
+Old model:  
+
+                                                               Doctor will constantly update and be updated
+                                                               about the status of both payment services     
+                                             ┌───────┐                      ┌──────┐
+                                ┌───────────►│KeyDB**│◄─────────┐   ┌──────►│Doctor│◄───────────┐
+                                │            └───────┘          ▼   ▼       └──────┘            │
+                                ▼                           ┌────────────┐                      │
+                            ┌───────┐                       │┌──────────┐│                      │                      ┌───────────────────┐
+                        ┌───┤App (1)├────┐               ┌──│┤Worker (1)├│───┐                  ▼                ┌───► │Payments (Default) │
+                        │   └───────┘    │               │  │└──────────┘│   │       ┌──────────────────────┐    │     └───────────────────┘
+           ┌───────┐    │   ┌───────┐    │   ┌──────┐    │  │┌──────────┐│   │       │Checks the variables: │    │
+           │Gateway├────┼───┤App (2)├────┼───┤Broker├────┼──│┤Worker (2)├│───┼──────►│   - IsPaymentsUp      │────┤
+           └───────┘    │   └───────┘    │   └──────┘    │  │└──────────┘│   │       │   - IsFallbackUp      │    │
+                        │   ┌───────┐    │               │  │┌──────────┐│   │       └──────────────────────┘    │     ┌───────────────────┐
+                        └───┤App*(3)├────┘               └──│┤Worker (3)├│───┘                                   └───► │Payments (Fallback)│
+                            └───────┘                       │└──────────┘│                                             └───────────────────┘
+                                                            └────────────┘       
+           LB model: Round Robin                                             
+                                                                                 
+           * Note: The number of instances may drop to 2
+             because the queue might get too large and the test
+             might stop before all are processed
+
+           ** Note: KeyDB is an in-memory database that
+              stores the number of requests each Payments
+              instance has received
+
+New model:  
+
+                                                                KeyDB Health Monitor will constantly receive values
+                                                                about the status of both payment services
+                                             ┌───────┐                      
+                                ┌───────────►│KeyDB**│◄─────────────────────────────────────────┐
+                                │            └───────┘                                          │
+                                ▼                           ┌────────────┐                      │
+                            ┌───────┐                       │┌──────────┐│                      │                      ┌───────────────────┐
+                        ┌───┤App (1)├────┐               ┌──│┤Worker (1)├│───┐                  ▼                ┌───► │Payments (Default) │
+                        │   └───────┘    │               │  │└──────────┘│   │       ┌──────────────────────┐    │     └───────────────────┘
+           ┌───────┐    │   ┌───────┐    │   ┌──────┐    │  │┌──────────┐│   │       │Checks the variables: │    │
+           │Gateway├────┼───┤App (2)├────┼───┤Broker├────┼──│┤Worker (2)├│───┼──────►│   - IsPaymentsUp     │────┤
+           └───────┘    │   └───────┘    │   └──────┘    │  │└──────────┘│   │       │   - IsFallbackUp     │    │
+                        │   ┌───────┐    │               │  │┌──────────┐│   │       └──────────────────────┘    │     ┌───────────────────┐
+                        └───┤App*(3)├────┘               └──│┤Worker (3)├│───┘                                   └───► │Payments (Fallback)│
+                            └───────┘                       │└──────────┘│                                             └───────────────────┘
+                                                            └────────────┘       
+           LB model: Round Robin                                             
+                                                                                 
+           * Note: The number of instances may drop to 2
+             because the queue might get too large and the test
+             might stop before all are processed
+
+           ** Note: KeyDB is an in-memory database that
+              stores the number of requests each Payments
+              instance has received
+
+Points to consider about the problem:
+
+1. The services have a 5s lock, meaning if more than one healthcheck call is made within 5s, the service will reset the timer and count another 5s of lock time.  
+2. Because of the lock, if a worker pings the service while it’s locked, the worker will receive a timeout error, and the next worker that pings the service will get another lock, and so on.  
+
+How the KeyDB Health Monitor solves this problem:  
+1. We will store a key called `"default_healthcheck"` and another called `"fallback_healthcheck"` in KeyDB.  
+2. W
+
